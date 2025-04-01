@@ -1280,7 +1280,11 @@ def team_select():
                       .filter(Entrant.team_name.isnot(None), Entrant.team_name != "")\
                       .distinct().all()
     team_list = [t[0] for t in teams]
-    return render_template_string(TEAM_SELECT_HTML, teams=team_list, is_admin=is_admin())
+    return render_template_string(
+        TEAM_SELECT_HTML, 
+        teams=team_list, 
+        is_admin=is_admin()
+    )
 
 @app.route('/edit_team/<team_name>')
 def edit_team(team_name):
