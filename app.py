@@ -4,9 +4,15 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, desc
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://cavs_draft_db_user:v9s8y3Xba3fEeF6G5kIsNFqPdSsLM2fI@dpg-cvm4uongi27c73ak0en0-a:5432/cavs_draft_db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///draft_game.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+
+# ------------------------------------------------------------------
+#  ADMIN CHECK
+# ------------------------------------------------------------------
+def is_admin():
+    return request.args.get("key") == "analytics"
 
 # ------------------------------------------------------------------
 #  DATABASE MODELS
@@ -368,10 +374,12 @@ STANDINGS_HTML = r"""
 </head>
 <body>
     <div class="navbar">
-        <a href="{{ url_for('enter_picks') }}">Enter Your Picks</a>
+    <a href="{{ url_for('enter_picks') }}">Enter Your Picks</a>
+    {% if is_admin() %}
         <a href="{{ url_for('admin_panel') }}">Admin Panel</a>
         <a href="{{ url_for('team_select') }}">Edit Team Predictions</a>
-    </div>
+    {% endif %}
+</div>
 
     <div class="container">
         <h1>Cavs Draft Confidence Pool 🏈</h1>
@@ -579,10 +587,12 @@ ADMIN_HTML = r"""
 </head>
 <body>
     <div class="navbar">
-        <a href="{{ url_for('standings') }}">View Standings</a>
+    <a href="{{ url_for('standings') }}">View Standings</a>
+    {% if is_admin() %}
         <a href="{{ url_for('enter_picks') }}">Enter Your Picks</a>
         <a href="{{ url_for('team_select') }}">Edit Team Predictions</a>
-    </div>
+    {% endif %}
+</div>
 
     <div class="container">
         <h1>Admin Panel</h1>
@@ -736,10 +746,12 @@ ENTER_PICKS_HTML = r"""
 </head>
 <body>
     <div class="navbar">
-        <a href="{{ url_for('standings') }}">View Standings</a>
+    <a href="{{ url_for('standings') }}">View Standings</a>
+    {% if is_admin() %}
         <a href="{{ url_for('admin_panel') }}">Admin Panel</a>
         <a href="{{ url_for('team_select') }}">Edit Team Predictions</a>
-    </div>
+    {% endif %}
+</div>
 
     <div class="container">
         <h1>Enter Your Picks (Up to Pick #{{ max_pick }})</h1>
@@ -855,10 +867,12 @@ TEAM_SELECT_HTML = r"""
 </head>
 <body>
     <div class="navbar">
-        <a href="{{ url_for('standings') }}">View Standings</a>
+    <a href="{{ url_for('standings') }}">View Standings</a>
+    {% if is_admin() %}
         <a href="{{ url_for('admin_panel') }}">Admin Panel</a>
         <a href="{{ url_for('enter_picks') }}">Enter Your Picks</a>
-    </div>
+    {% endif %}
+</div>
     <div class="container">
         <h1>Select a Team to View/Edit</h1>
 
@@ -957,11 +971,13 @@ EDIT_TEAM_HTML = r"""
 </head>
 <body>
     <div class="navbar">
-        <a href="{{ url_for('team_select') }}">Select Another Team</a>
-        <a href="{{ url_for('standings') }}">View Standings</a>
+    <a href="{{ url_for('team_select') }}">Select Another Team</a>
+    <a href="{{ url_for('standings') }}">View Standings</a>
+    {% if is_admin() %}
         <a href="{{ url_for('admin_panel') }}">Admin Panel</a>
         <a href="{{ url_for('enter_picks') }}">Enter New Picks</a>
-    </div>
+    {% endif %}
+</div>
     <div class="container">
         <h1>Edit Predictions for Team: {{ team_name }}</h1>
         
@@ -1101,6 +1117,11 @@ def standings():
 
 @app.route('/admin')
 def admin_panel():
+    if not is_admin():
+        return redirect(url_for('standings'))
+    if request.args.get("key") != "analytics":
+        return redirect(url_for('standings'))
+
     picks = ActualPick.query.order_by(ActualPick.pick_number).all()
     teams_data = db.session.query(Entrant).filter(Entrant.team_name.isnot(None)).all()
     return render_template_string(
@@ -1245,6 +1266,11 @@ def submit_picks():
 
 @app.route('/team_select')
 def team_select():
+    if not is_admin():
+        return redirect(url_for('standings'))
+    if request.args.get("key") != "analytics":
+        return redirect(url_for('standings'))
+
     teams = db.session.query(Entrant.team_name)\
                       .filter(Entrant.team_name.isnot(None), Entrant.team_name != "")\
                       .distinct().all()
@@ -1253,6 +1279,8 @@ def team_select():
 
 @app.route('/edit_team/<team_name>')
 def edit_team(team_name):
+    if not is_admin():
+        return redirect(url_for('standings'))
     error_message = request.args.get('error', '')
     entrant = Entrant.query.filter_by(team_name=team_name).first()
     if not entrant:
@@ -1289,8 +1317,10 @@ def edit_team(team_name):
 
 @app.route('/initdb')
 def initdb():
+    if not is_admin():
+        return redirect(url_for('standings'))
     db.create_all()
-    return "Database tables created!"   
+    return "Database tables created!" 
 
 @app.route('/save_team/<team_name>', methods=['POST'])
 def save_team(team_name):
