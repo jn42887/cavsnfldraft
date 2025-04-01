@@ -1287,7 +1287,7 @@ def edit_team(team_name):
         error_message=error_message
     )
 
- @app.route('/initdb')
+@app.route('/initdb')
 def initdb():
     db.create_all()
     return "Database tables created!"   
