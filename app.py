@@ -1060,15 +1060,30 @@ def find_duplicate_pick_numbers(pick_map):
 
 @app.route('/')
 def standings():
-    all_picks = ActualPick.query.order_by(ActualPick.pick_number).all()
-    entrants_with_scores = (
-        db.session.query(Entrant, EntrantStanding.total_score)
-        .outerjoin(EntrantStanding, EntrantStanding.entrant_id == Entrant.entrant_id)
-        .order_by(desc(EntrantStanding.total_score))
-        .all()
-    )
+    try:
+        all_picks = ActualPick.query.order_by(ActualPick.pick_number).all()
+    except Exception as e:
+        all_picks = []
+        print(f"Warning: actual_picks table not available yet. {e}")
+
+    try:
+        entrants_with_scores = (
+            db.session.query(Entrant, EntrantStanding.total_score)
+            .outerjoin(EntrantStanding, EntrantStanding.entrant_id == Entrant.entrant_id)
+            .order_by(desc(EntrantStanding.total_score))
+            .all()
+        )
+    except Exception as e:
+        entrants_with_scores = []
+        print(f"Warning: standings query failed. {e}")
+
+    try:
+        all_preds = Prediction.query.all()
+    except Exception as e:
+        all_preds = []
+        print(f"Warning: predictions query failed. {e}")
+
     chunked_picks = list(chunk_list(all_picks, CHUNK_SIZE)) if all_picks else []
-    all_preds = Prediction.query.all()
 
     predictions_dict = {}
     for pr in all_preds:
