@@ -1112,7 +1112,8 @@ def standings():
         all_picks=all_picks,
         chunked_picks=chunked_picks,
         entrants_sorted=entrants_with_scores,
-        predictions=predictions_dict
+        predictions=predictions_dict,
+        is_admin=is_admin()
     )
 
 @app.route('/admin')
@@ -1128,7 +1129,8 @@ def admin_panel():
         ADMIN_HTML,
         picks=picks,
         player_names=PLAYER_NAME_SUGGESTIONS,
-        teams_data=teams_data
+        teams_data=teams_data,
+        is_admin=is_admin()
     )
 
 @app.route('/update_pick', methods=['POST'])
@@ -1187,7 +1189,8 @@ def enter_picks():
         player_names=PLAYER_NAME_SUGGESTIONS,
         error_message=error_message,
         form_data=form_data,
-        duplicate_picks=duplicate_picks
+        duplicate_picks=duplicate_picks,
+        is_admin=is_admin()
     )
 
 @app.route('/submit_picks', methods=['POST'])
@@ -1212,7 +1215,8 @@ def submit_picks():
             player_names=PLAYER_NAME_SUGGESTIONS,
             error_message=error_message,
             form_data=form_data,
-            duplicate_picks=duplicate_set
+            duplicate_picks=duplicate_set,
+            is_admin=is_admin()
         )
 
     # Must ensure each picked name is in the official list
@@ -1228,7 +1232,8 @@ def submit_picks():
                 player_names=PLAYER_NAME_SUGGESTIONS,
                 error_message=error,
                 form_data=form_data,
-                duplicate_picks=[]
+                duplicate_picks=[],
+                is_admin=is_admin()
             )
 
     if not entrant_name:
@@ -1275,7 +1280,7 @@ def team_select():
                       .filter(Entrant.team_name.isnot(None), Entrant.team_name != "")\
                       .distinct().all()
     team_list = [t[0] for t in teams]
-    return render_template_string(TEAM_SELECT_HTML, teams=team_list)
+    return render_template_string(TEAM_SELECT_HTML, teams=team_list, is_admin=is_admin())
 
 @app.route('/edit_team/<team_name>')
 def edit_team(team_name):
@@ -1292,7 +1297,8 @@ def edit_team(team_name):
             duplicate_picks=[],
             max_pick=MAX_PICK_NUMBER,
             player_names=PLAYER_NAME_SUGGESTIONS,
-            error_message=error_message
+            error_message=error_message,
+            is_admin=is_admin()
         )
 
     preds = Prediction.query.filter_by(entrant_id=entrant.entrant_id).all()
@@ -1312,7 +1318,8 @@ def edit_team(team_name):
         duplicate_picks=duplicate_picks,
         max_pick=MAX_PICK_NUMBER,
         player_names=PLAYER_NAME_SUGGESTIONS,
-        error_message=error_message
+        error_message=error_message,
+        is_admin=is_admin()
     )
 
 @app.route('/initdb')
