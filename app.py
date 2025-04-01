@@ -1287,6 +1287,11 @@ def edit_team(team_name):
         error_message=error_message
     )
 
+ @app.route('/initdb')
+def initdb():
+    db.create_all()
+    return "Database tables created!"   
+
 @app.route('/save_team/<team_name>', methods=['POST'])
 def save_team(team_name):
     entrant = Entrant.query.filter_by(team_name=team_name).first()
@@ -1356,3 +1361,4 @@ if __name__ == '__main__':
             db.create_all()
 
     app.run(host='0.0.0.0', port=10000)
+
