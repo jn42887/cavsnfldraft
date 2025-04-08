@@ -222,6 +222,7 @@ PLAYER_NAME_SUGGESTIONS = [
     "Tyler Baron, EDGE (Ole Miss)",
     "Tyler Batty, DL (BYU)",
     "Tyler Booker, OL (Alabama)",
+    "Tyler Shough, QB (Louisville)",
     "Tyler Warren, TE (Penn State)",
     "Walter Nolen, DL (Ole Miss)",
     "Will Campbell, OL (LSU)",
