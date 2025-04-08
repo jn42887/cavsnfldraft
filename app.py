@@ -7,6 +7,8 @@ import csv
 from io import StringIO
 from flask import make_response
 
+from datetime import datetime
+
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://cavs_draft_db_user:v9s8y3Xba3fEeF6G5kIsNFqPdSsLM2fI@dpg-cvm4uongi27c73ak0en0-a:5432/cavs_draft_db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -594,7 +596,8 @@ ADMIN_HTML = r"""
 
     <div class="container">
         <h1>Admin Panel</h1>
-        <form method="GET" action="{{ url_for('export_data', key=request.args.get('key')) }}">
+        <form method="GET" action="{{ url_for('export_data') }}">
+            <input type="hidden" name="key" value="{{ request.args.get('key') }}">
             <button type="submit" class="submit-btn">📄 Export All Data as CSV</button>
         </form>
         <p>Use the form below to add or edit actual picks in real time.</p>
@@ -1222,10 +1225,11 @@ def enter_picks():
         key=request.args.get("key")
     )
 
-@app.route('/export_data')
+@app.route('/export_data', methods=['GET', 'POST'])
 def export_data():
-    if not is_admin():
-        return redirect(url_for('standings', key=request.args.get("key")))
+    key = request.args.get("key") or request.form.get("key")
+    if key != 'analytics':
+        return redirect(url_for('standings', key=key))
 
     output = StringIO()
     writer = csv.writer(output)
@@ -1254,10 +1258,15 @@ def export_data():
         writer.writerow([name, team or "", pick_num, player])
 
     output.seek(0)
+
+    # 👇 Add timestamp to filename
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"draft_data_export_{timestamp}.csv"
+
     response = make_response(output.getvalue())
-    response.headers["Content-Disposition"] = "attachment; filename=draft_data_export.csv"
+    response.headers["Content-Disposition"] = f"attachment; filename={filename}"
     response.headers["Content-type"] = "text/csv"
-    return response    
+    return response   
 
 @app.route('/submit_picks', methods=['POST'])
 def submit_picks():
