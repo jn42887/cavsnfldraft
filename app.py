@@ -367,10 +367,12 @@ STANDINGS_HTML = r"""
     </style>
 </head>
 <body>
-    <div class="navbar">
-        <a href="{{ url_for('enter_picks') }}">Enter Your Picks</a>
-        <a href="{{ url_for('admin_panel') }}">Admin Panel</a>
-        <a href="{{ url_for('team_select') }}">Edit Team Predictions</a>
+    <<div class="navbar">
+        <a href="{{ url_for('enter_picks', key=request.args.get('key')) }}">Enter Your Picks</a>
+        {% if request.args.get('key') == 'analytics' %}
+            <a href="{{ url_for('admin_panel', key='analytics') }}">Admin Panel</a>
+            <a href="{{ url_for('team_select', key='analytics') }}">Edit Team Predictions</a>
+        {% endif %}
     </div>
 
     <div class="container">
@@ -579,9 +581,11 @@ ADMIN_HTML = r"""
 </head>
 <body>
     <div class="navbar">
-        <a href="{{ url_for('standings') }}">View Standings</a>
-        <a href="{{ url_for('enter_picks') }}">Enter Your Picks</a>
-        <a href="{{ url_for('team_select') }}">Edit Team Predictions</a>
+        <a href="{{ url_for('standings', key=request.args.get('key')) }}">View Standings</a>
+        <a href="{{ url_for('enter_picks', key=request.args.get('key')) }}">Enter Your Picks</a>
+        {% if request.args.get('key') == 'analytics' %}
+            <a href="{{ url_for('team_select', key='analytics') }}">Edit Team Predictions</a>
+        {% endif %}
     </div>
 
     <div class="container">
@@ -736,9 +740,11 @@ ENTER_PICKS_HTML = r"""
 </head>
 <body>
     <div class="navbar">
-        <a href="{{ url_for('standings') }}">View Standings</a>
-        <a href="{{ url_for('admin_panel') }}">Admin Panel</a>
-        <a href="{{ url_for('team_select') }}">Edit Team Predictions</a>
+        <a href="{{ url_for('standings', key=request.args.get('key')) }}">View Standings</a>
+        {% if request.args.get('key') == 'analytics' %}
+            <a href="{{ url_for('admin_panel', key='analytics') }}">Admin Panel</a>
+            <a href="{{ url_for('team_select', key='analytics') }}">Edit Team Predictions</a>
+        {% endif %}
     </div>
 
     <div class="container">
@@ -855,9 +861,11 @@ TEAM_SELECT_HTML = r"""
 </head>
 <body>
     <div class="navbar">
-        <a href="{{ url_for('standings') }}">View Standings</a>
-        <a href="{{ url_for('admin_panel') }}">Admin Panel</a>
-        <a href="{{ url_for('enter_picks') }}">Enter Your Picks</a>
+        <a href="{{ url_for('standings', key=request.args.get('key')) }}">View Standings</a>
+        <a href="{{ url_for('enter_picks', key=request.args.get('key')) }}">Enter Your Picks</a>
+        {% if request.args.get('key') == 'analytics' %}
+        <   a href="{{ url_for('admin_panel', key='analytics') }}">Admin Panel</a>
+        {% endif %}
     </div>
     <div class="container">
         <h1>Select a Team to View/Edit</h1>
@@ -957,10 +965,14 @@ EDIT_TEAM_HTML = r"""
 </head>
 <body>
     <div class="navbar">
-        <a href="{{ url_for('team_select') }}">Select Another Team</a>
-        <a href="{{ url_for('standings') }}">View Standings</a>
-        <a href="{{ url_for('admin_panel') }}">Admin Panel</a>
-        <a href="{{ url_for('enter_picks') }}">Enter New Picks</a>
+        {% if request.args.get('key') == 'analytics' %}
+            <a href="{{ url_for('team_select', key='analytics') }}">Select Another Team</a>
+            <a href="{{ url_for('standings', key='analytics') }}">View Standings</a>
+            <a href="{{ url_for('admin_panel', key='analytics') }}">Admin Panel</a>
+            <a href="{{ url_for('enter_picks', key='analytics') }}">Enter New Picks</a>
+        {% else %}
+            <a href="{{ url_for('standings') }}">View Standings</a>
+        {% endif %}
     </div>
     <div class="container">
         <h1>Edit Predictions for Team: {{ team_name }}</h1>
@@ -1054,6 +1066,9 @@ def find_duplicate_pick_numbers(pick_map):
             duplicates.update(picks)
     return duplicates
 
+def is_admin():
+    return request.args.get("key") == "analytics"    
+
 # ------------------------------------------------------------------
 #  FLASK ROUTES
 # ------------------------------------------------------------------
@@ -1096,38 +1111,44 @@ def standings():
         all_picks=all_picks,
         chunked_picks=chunked_picks,
         entrants_sorted=entrants_with_scores,
-        predictions=predictions_dict
+        predictions=predictions_dict, 
+        key=request.args.get("key")
     )
 
 @app.route('/admin')
 def admin_panel():
+    if not is_admin():
+        return redirect(url_for('standings', key=request.args.get("key")))
     picks = ActualPick.query.order_by(ActualPick.pick_number).all()
     teams_data = db.session.query(Entrant).filter(Entrant.team_name.isnot(None)).all()
     return render_template_string(
         ADMIN_HTML,
         picks=picks,
         player_names=PLAYER_NAME_SUGGESTIONS,
-        teams_data=teams_data
+        teams_data=teams_data, 
+        key=request.args.get("key")
     )
 
 @app.route('/update_pick', methods=['POST'])
 def update_pick():
+    if not is_admin():
+        return redirect(url_for('standings', key=request.args.get("key")))
     pick_number = request.form.get('pick_number', '')
     player_name = request.form.get('player_name', '').strip()
 
     # Force pick_number in [1..32].
     if not pick_number.isdigit():
-        return redirect(url_for('admin_panel'))
+        return redirect(url_for('admin_panel', key=request.args.get("key")))
     pick_num = int(pick_number)
     if pick_num < 1 or pick_num > 32:
-        return redirect(url_for('admin_panel'))
+        return redirect(url_for('admin_panel', key=request.args.get("key")))
 
     if not player_name:
-        return redirect(url_for('admin_panel'))
+        return redirect(url_for('admin_panel', key=request.args.get("key")))
 
     # ✅ ENFORCE official player list
     if player_name not in PLAYER_NAME_SUGGESTIONS:
-        return redirect(url_for('admin_panel'))
+        return redirect(url_for('admin_panel', key=request.args.get("key")))
 
     actual_pick = ActualPick.query.filter_by(pick_number=pick_num).first()
     if not actual_pick:
@@ -1138,14 +1159,16 @@ def update_pick():
     db.session.commit()
 
     recalc_scores_for_pick(pick_num, player_name)
-    return redirect(url_for('admin_panel'))
+    return redirect(url_for('admin_panel', key=request.args.get("key")))
 
 @app.route('/delete_team', methods=['POST'])
 def delete_team():
+    if not is_admin():
+        return redirect(url_for('standings', key=request.args.get("key")))
     team_name = request.form.get('team_name')
     entrant_id = request.form.get('entrant_id')
     if not team_name or not entrant_id:
-        return redirect(url_for('admin_panel'))
+        return redirect(url_for('admin_panel', key=request.args.get("key")))
 
     entrant = Entrant.query.filter_by(entrant_id=entrant_id).first()
     if entrant:
@@ -1153,7 +1176,7 @@ def delete_team():
         EntrantStanding.query.filter_by(entrant_id=entrant.entrant_id).delete()
         db.session.delete(entrant)
         db.session.commit()
-    return redirect(url_for('admin_panel'))
+    return redirect(url_for('admin_panel', key=request.args.get("key")))
 
 @app.route('/enter_picks')
 def enter_picks():
@@ -1166,7 +1189,8 @@ def enter_picks():
         player_names=PLAYER_NAME_SUGGESTIONS,
         error_message=error_message,
         form_data=form_data,
-        duplicate_picks=duplicate_picks
+        duplicate_picks=duplicate_picks, 
+        key=request.args.get("key")
     )
 
 @app.route('/submit_picks', methods=['POST'])
@@ -1191,7 +1215,8 @@ def submit_picks():
             player_names=PLAYER_NAME_SUGGESTIONS,
             error_message=error_message,
             form_data=form_data,
-            duplicate_picks=duplicate_set
+            duplicate_picks=duplicate_set, 
+            key=request.args.get("key")
         )
 
     # Must ensure each picked name is in the official list
@@ -1207,11 +1232,12 @@ def submit_picks():
                 player_names=PLAYER_NAME_SUGGESTIONS,
                 error_message=error,
                 form_data=form_data,
-                duplicate_picks=[]
+                duplicate_picks=[], 
+                key=request.args.get("key")
             )
 
     if not entrant_name:
-        return redirect(url_for('enter_picks'))
+        return redirect(url_for('enter_picks', key=request.args.get("key")))
 
     # Find or create entrant
     entrant = Entrant.query.filter_by(name=entrant_name).first()
@@ -1241,18 +1267,22 @@ def submit_picks():
     db.session.commit()
 
     recalc_all_picks()
-    return redirect(url_for('standings'))
+    return redirect(url_for('standings', key=request.args.get("key")))
 
 @app.route('/team_select')
 def team_select():
+    if not is_admin():
+        return redirect(url_for('standings', key=request.args.get("key")))
     teams = db.session.query(Entrant.team_name)\
                       .filter(Entrant.team_name.isnot(None), Entrant.team_name != "")\
                       .distinct().all()
     team_list = [t[0] for t in teams]
-    return render_template_string(TEAM_SELECT_HTML, teams=team_list)
+    return render_template_string(TEAM_SELECT_HTML, teams=team_list, key=request.args.get("key"))
 
 @app.route('/edit_team/<team_name>')
 def edit_team(team_name):
+    if not is_admin():
+        return redirect(url_for('standings', key=request.args.get("key")))
     error_message = request.args.get('error', '')
     entrant = Entrant.query.filter_by(team_name=team_name).first()
     if not entrant:
@@ -1264,7 +1294,8 @@ def edit_team(team_name):
             duplicate_picks=[],
             max_pick=MAX_PICK_NUMBER,
             player_names=PLAYER_NAME_SUGGESTIONS,
-            error_message=error_message
+            error_message=error_message, 
+            key=request.args.get("key")
         )
 
     preds = Prediction.query.filter_by(entrant_id=entrant.entrant_id).all()
@@ -1284,7 +1315,8 @@ def edit_team(team_name):
         duplicate_picks=duplicate_picks,
         max_pick=MAX_PICK_NUMBER,
         player_names=PLAYER_NAME_SUGGESTIONS,
-        error_message=error_message
+        error_message=error_message, 
+        key=request.args.get("key")
     )
 
 @app.route('/initdb')
@@ -1294,9 +1326,11 @@ def initdb():
 
 @app.route('/save_team/<team_name>', methods=['POST'])
 def save_team(team_name):
+    if not is_admin():
+        return redirect(url_for('standings', key=request.args.get("key")))
     entrant = Entrant.query.filter_by(team_name=team_name).first()
     if not entrant:
-        return redirect(url_for('team_select'))
+        return redirect(url_for('team_select', key=request.args.get("key")))
 
     pick_map = {}
     for pick_number in range(1, MAX_PICK_NUMBER + 1):
@@ -1314,7 +1348,8 @@ def save_team(team_name):
         return redirect(url_for('edit_team',
                                 team_name=team_name,
                                 error=error_message,
-                                duplicates=duplicates_str))
+                                duplicates=duplicates_str), 
+                                key=request.args.get("key"))
 
     # Also ensure picks are in the official list
     for pn, player in pick_map.items():
@@ -1327,7 +1362,8 @@ def save_team(team_name):
             return redirect(url_for('edit_team',
                                     team_name=team_name,
                                     error=error,
-                                    duplicates=duplicates_str))
+                                    duplicates=duplicates_str), 
+                                    key=request.args.get("key"))
 
     # Save
     for pick_number in range(1, MAX_PICK_NUMBER + 1):
@@ -1347,7 +1383,7 @@ def save_team(team_name):
         db.session.commit()
 
     recalc_all_picks()
-    return redirect(url_for('standings'))
+    return redirect(url_for('standings', key=request.args.get("key")))
 
 # ------------------------------------------------------------------
 #  MAIN
@@ -1361,4 +1397,3 @@ if __name__ == '__main__':
             db.create_all()
 
     app.run(host='0.0.0.0', port=10000)
-
