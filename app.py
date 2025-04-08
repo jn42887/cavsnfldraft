@@ -1164,22 +1164,31 @@ def update_pick():
 
 @app.route('/delete_team', methods=['POST'])
 def delete_team():
-    key = request.form.get('key')  # pull it from the form
+    key = request.form.get('key')
     if key != 'analytics':
         return redirect(url_for('standings', key=key))
 
     team_name = request.form.get('team_name')
-    entrant_id = int(request.form.get('entrant_id'))
-    if not team_name or not entrant_id:
+    entrant_id_raw = request.form.get('entrant_id')
+    print("Deleting Entrant ID:", entrant_id_raw)
+
+    try:
+        entrant_id = int(entrant_id_raw)
+    except (TypeError, ValueError):
+        print("Invalid entrant_id value.")
         return redirect(url_for('admin_panel', key=key))
 
     entrant = Entrant.query.filter_by(entrant_id=entrant_id).first()
     if entrant:
+        print(f"Found entrant: {entrant.name}")
         Prediction.query.filter_by(entrant_id=entrant.entrant_id).delete()
         EntrantStanding.query.filter_by(entrant_id=entrant.entrant_id).delete()
         db.session.delete(entrant)
         db.session.commit()
-    
+        print("Deleted successfully.")
+    else:
+        print("No entrant found.")
+
     return redirect(url_for('admin_panel', key=key))
 
 @app.route('/enter_picks')
