@@ -367,7 +367,7 @@ STANDINGS_HTML = r"""
     </style>
 </head>
 <body>
-    <<div class="navbar">
+    <div class="navbar">
         <a href="{{ url_for('enter_picks', key=request.args.get('key')) }}">Enter Your Picks</a>
         {% if request.args.get('key') == 'analytics' %}
             <a href="{{ url_for('admin_panel', key='analytics') }}">Admin Panel</a>
@@ -603,6 +603,7 @@ ADMIN_HTML = r"""
             <input type="number" id="pick_number" name="pick_number" min="1" max="32" required>
             <label for="player_name">Player Name:</label>
             <input type="text" id="player_name" name="player_name" list="player_list" required>
+            <input type="hidden" name="key" value="{{ request.args.get('key') }}">
             <input type="submit" value="Save New/Overwrite">
         </form>
 
@@ -878,7 +879,7 @@ TEAM_SELECT_HTML = r"""
         {% if teams %}
         <div class="team-list">
             {% for team in teams %}
-                <a class="team-link" href="{{ url_for('edit_team', team_name=team) }}">{{ team }}</a>
+                <a class="team-link" href="{{ url_for('edit_team', team_name=team, key=request.args.get('key')) }}">{{ team }}</a>
             {% endfor %}
         </div>
         {% else %}
@@ -962,9 +963,6 @@ EDIT_TEAM_HTML = r"""
         }
         .duplicate {
             border: 2px solid red;
-        }
-        datalist {
-            display: none;
         }
     </style>
 </head>
@@ -1072,7 +1070,7 @@ def find_duplicate_pick_numbers(pick_map):
     return duplicates
 
 def is_admin():
-    return request.args.get("key") == "analytics"    
+    return request.args.get("key") == "analytics" or request.form.get("key") == "analytics"   
 
 # ------------------------------------------------------------------
 #  FLASK ROUTES
@@ -1137,23 +1135,28 @@ def admin_panel():
 @app.route('/update_pick', methods=['POST'])
 def update_pick():
     if not is_admin():
-        return redirect(url_for('standings', key=request.args.get("key")))
+        key = request.form.get("key") or request.args.get("key")
+        return redirect(url_for('standings', key=key))
     pick_number = request.form.get('pick_number', '')
     player_name = request.form.get('player_name', '').strip()
 
     # Force pick_number in [1..32].
     if not pick_number.isdigit():
-        return redirect(url_for('admin_panel', key=request.args.get("key")))
+        key = request.form.get("key") or request.args.get("key")
+        return redirect(url_for('admin_panel', key=key))
     pick_num = int(pick_number)
     if pick_num < 1 or pick_num > 32:
-        return redirect(url_for('admin_panel', key=request.args.get("key")))
+        key = request.form.get("key") or request.args.get("key")
+        return redirect(url_for('admin_panel', key=key))
 
     if not player_name:
-        return redirect(url_for('admin_panel', key=request.args.get("key")))
+        key = request.form.get("key") or request.args.get("key")
+        return redirect(url_for('admin_panel', key=key))
 
     # ✅ ENFORCE official player list
     if player_name not in PLAYER_NAME_SUGGESTIONS:
-        return redirect(url_for('admin_panel', key=request.args.get("key")))
+        key = request.form.get("key") or request.args.get("key")
+        return redirect(url_for('admin_panel', key=key))
 
     actual_pick = ActualPick.query.filter_by(pick_number=pick_num).first()
     if not actual_pick:
@@ -1164,7 +1167,8 @@ def update_pick():
     db.session.commit()
 
     recalc_scores_for_pick(pick_num, player_name)
-    return redirect(url_for('admin_panel', key=request.args.get("key")))
+    key = request.form.get("key") or request.args.get("key")
+    return redirect(url_for('admin_panel', key=key))
 
 @app.route('/delete_team', methods=['POST'])
 def delete_team():
@@ -1424,10 +1428,6 @@ def save_team(team_name):
 # ------------------------------------------------------------------
 if __name__ == '__main__':
     with app.app_context():
-        if not os.path.exists('draft_game.db'):
-            db.create_all()
-            # No pre-populated data (start empty).
-        else:
-            db.create_all()
+        db.create_all()
 
     app.run(host='0.0.0.0', port=10000)
