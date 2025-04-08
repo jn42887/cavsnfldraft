@@ -1169,7 +1169,7 @@ def delete_team():
         return redirect(url_for('standings', key=key))
 
     team_name = request.form.get('team_name')
-    entrant_id = request.form.get('entrant_id')
+    entrant_id = int(request.form.get('entrant_id'))
     if not team_name or not entrant_id:
         return redirect(url_for('admin_panel', key=key))
 
