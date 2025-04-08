@@ -620,9 +620,13 @@ ADMIN_HTML = r"""
                     <form action="{{ url_for('update_pick') }}" method="POST" style="display:inline;">
                         <input type="hidden" name="pick_number" value="{{ pick.pick_number }}">
                         <input type="text" name="player_name" value="{{ pick.player_name }}" list="player_list">
-                </td>
-                <td>
+                        <input type="hidden" name="key" value="{{ request.args.get('key') }}">
                         <input type="submit" value="Save">
+                    </form>
+                    <form action="{{ url_for('delete_pick') }}" method="POST" style="display:inline; margin-left: 10px;">
+                        <input type="hidden" name="pick_number" value="{{ pick.pick_number }}">
+                        <input type="hidden" name="key" value="{{ request.args.get('key') }}">
+                        <input class="delete-btn" type="submit" value="Delete">
                     </form>
                 </td>
             </tr>
@@ -1282,6 +1286,23 @@ def submit_picks():
     recalc_all_picks()
     return redirect(url_for('standings', key=request.args.get("key")))
 
+@app.route('/delete_pick', methods=['POST'])
+def delete_pick():
+    key = request.form.get('key')
+    if key != 'analytics':
+        return redirect(url_for('standings'))
+
+    pick_number = request.form.get('pick_number')
+    if not pick_number or not pick_number.isdigit():
+        return redirect(url_for('admin_panel', key=key))
+
+    pick_number = int(pick_number)
+    ActualPick.query.filter_by(pick_number=pick_number).delete()
+    db.session.commit()
+
+    recalc_scores_for_pick(pick_number, "")  # Reset any awarded points
+    return redirect(url_for('admin_panel', key=key))    
+
 @app.route('/team_select')
 def team_select():
     if not is_admin():
@@ -1396,7 +1417,7 @@ def save_team(team_name):
         db.session.commit()
 
     recalc_all_picks()
-    return redirect(url_for('standings', key=request.args.get("key")))
+    return redirect(url_for('edit_team', team_name=team_name, key=request.args.get("key")))
 
 # ------------------------------------------------------------------
 #  MAIN
