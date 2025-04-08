@@ -645,6 +645,7 @@ ADMIN_HTML = r"""
                     <form action="{{ url_for('delete_team') }}" method="POST">
                         <input type="hidden" name="team_name" value="{{ row.team_name }}">
                         <input type="hidden" name="entrant_id" value="{{ row.entrant_id }}">
+                        <input type="hidden" name="key" value="{{ request.args.get('key') }}">
                         <button class="delete-btn" type="submit">Delete</button>
                     </form>
                 </td>
@@ -1163,12 +1164,14 @@ def update_pick():
 
 @app.route('/delete_team', methods=['POST'])
 def delete_team():
-    if not is_admin():
-        return redirect(url_for('standings', key=request.args.get("key")))
+    key = request.form.get('key')  # pull it from the form
+    if key != 'analytics':
+        return redirect(url_for('standings', key=key))
+
     team_name = request.form.get('team_name')
     entrant_id = request.form.get('entrant_id')
     if not team_name or not entrant_id:
-        return redirect(url_for('admin_panel', key=request.args.get("key")))
+        return redirect(url_for('admin_panel', key=key))
 
     entrant = Entrant.query.filter_by(entrant_id=entrant_id).first()
     if entrant:
@@ -1176,7 +1179,8 @@ def delete_team():
         EntrantStanding.query.filter_by(entrant_id=entrant.entrant_id).delete()
         db.session.delete(entrant)
         db.session.commit()
-    return redirect(url_for('admin_panel', key=request.args.get("key")))
+    
+    return redirect(url_for('admin_panel', key=key))
 
 @app.route('/enter_picks')
 def enter_picks():
@@ -1348,8 +1352,8 @@ def save_team(team_name):
         return redirect(url_for('edit_team',
                                 team_name=team_name,
                                 error=error_message,
-                                duplicates=duplicates_str), 
-                                key=request.args.get("key"))
+                                duplicates=duplicates_str, 
+                                key=request.args.get("key")))
 
     # Also ensure picks are in the official list
     for pn, player in pick_map.items():
@@ -1362,8 +1366,8 @@ def save_team(team_name):
             return redirect(url_for('edit_team',
                                     team_name=team_name,
                                     error=error,
-                                    duplicates=duplicates_str), 
-                                    key=request.args.get("key"))
+                                    duplicates=duplicates_str, 
+                                    key=request.args.get("key")))
 
     # Save
     for pick_number in range(1, MAX_PICK_NUMBER + 1):
