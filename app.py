@@ -3,6 +3,10 @@ from flask import Flask, request, redirect, url_for, render_template_string
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, desc
 
+import csv
+from io import StringIO
+from flask import make_response
+
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://cavs_draft_db_user:v9s8y3Xba3fEeF6G5kIsNFqPdSsLM2fI@dpg-cvm4uongi27c73ak0en0-a:5432/cavs_draft_db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -590,6 +594,9 @@ ADMIN_HTML = r"""
 
     <div class="container">
         <h1>Admin Panel</h1>
+        <form method="GET" action="{{ url_for('export_data', key=request.args.get('key')) }}">
+            <button type="submit" class="submit-btn">📄 Export All Data as CSV</button>
+        </form>
         <p>Use the form below to add or edit actual picks in real time.</p>
 
         <datalist id="player_list">
@@ -1214,6 +1221,43 @@ def enter_picks():
         duplicate_picks=duplicate_picks, 
         key=request.args.get("key")
     )
+
+@app.route('/export_data')
+def export_data():
+    if not is_admin():
+        return redirect(url_for('standings', key=request.args.get("key")))
+
+    output = StringIO()
+    writer = csv.writer(output)
+
+    # First section: Standings
+    writer.writerow(['Entrant Name', 'Team Name', 'Total Score'])
+    standings = (
+        db.session.query(Entrant.name, Entrant.team_name, EntrantStanding.total_score)
+        .outerjoin(EntrantStanding, Entrant.entrant_id == EntrantStanding.entrant_id)
+        .all()
+    )
+    for name, team, score in standings:
+        writer.writerow([name, team or "", score or 0])
+
+    writer.writerow([])  # Empty row between sections
+
+    # Second section: Predictions
+    writer.writerow(['Entrant Name', 'Team Name', 'Pick #', 'Predicted Player'])
+    preds = (
+        db.session.query(Entrant.name, Entrant.team_name, Prediction.pick_number, Prediction.predicted_player_name)
+        .join(Prediction, Entrant.entrant_id == Prediction.entrant_id)
+        .order_by(Entrant.name, Prediction.pick_number)
+        .all()
+    )
+    for name, team, pick_num, player in preds:
+        writer.writerow([name, team or "", pick_num, player])
+
+    output.seek(0)
+    response = make_response(output.getvalue())
+    response.headers["Content-Disposition"] = "attachment; filename=draft_data_export.csv"
+    response.headers["Content-type"] = "text/csv"
+    return response    
 
 @app.route('/submit_picks', methods=['POST'])
 def submit_picks():
