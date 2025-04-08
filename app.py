@@ -986,6 +986,7 @@ EDIT_TEAM_HTML = r"""
 
         {% if entrant %}
             <form method="POST" action="{{ url_for('save_team', team_name=team_name) }}">
+                <input type="hidden" name="key" value="{{ request.args.get('key') }}">
                 <datalist id="player_list">
                     {% for p_name in player_names %}
                         <option value="{{ p_name }}">
@@ -1365,10 +1366,10 @@ def initdb():
 @app.route('/save_team/<team_name>', methods=['POST'])
 def save_team(team_name):
     if not is_admin():
-        return redirect(url_for('standings', key=request.args.get("key")))
+        return redirect(url_for('standings', key = request.args.get("key") or request.form.get("key")))
     entrant = Entrant.query.filter_by(team_name=team_name).first()
     if not entrant:
-        return redirect(url_for('team_select', key=request.args.get("key")))
+        return redirect(url_for('team_select', key = request.args.get("key") or request.form.get("key")))
 
     pick_map = {}
     for pick_number in range(1, MAX_PICK_NUMBER + 1):
@@ -1401,7 +1402,7 @@ def save_team(team_name):
                                     team_name=team_name,
                                     error=error,
                                     duplicates=duplicates_str, 
-                                    key=request.args.get("key")))
+                                    key = request.args.get("key") or request.form.get("key")))
 
     # Save
     for pick_number in range(1, MAX_PICK_NUMBER + 1):
@@ -1421,7 +1422,7 @@ def save_team(team_name):
         db.session.commit()
 
     recalc_all_picks()
-    return redirect(url_for('edit_team', team_name=team_name, key=request.args.get("key")))
+    return redirect(url_for('edit_team', team_name=team_name, key = request.args.get("key") or request.form.get("key")))
 
 # ------------------------------------------------------------------
 #  MAIN
