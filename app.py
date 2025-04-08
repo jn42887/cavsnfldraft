@@ -865,7 +865,7 @@ TEAM_SELECT_HTML = r"""
         <a href="{{ url_for('standings', key=request.args.get('key')) }}">View Standings</a>
         <a href="{{ url_for('enter_picks', key=request.args.get('key')) }}">Enter Your Picks</a>
         {% if request.args.get('key') == 'analytics' %}
-        <   a href="{{ url_for('admin_panel', key='analytics') }}">Admin Panel</a>
+        <a href="{{ url_for('admin_panel', key='analytics') }}">Admin Panel</a>
         {% endif %}
     </div>
     <div class="container">
