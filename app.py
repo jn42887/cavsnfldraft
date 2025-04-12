@@ -22,6 +22,7 @@ class Entrant(db.Model):
     entrant_id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     team_name = db.Column(db.String(100), nullable=True)
+    tiebreaker_guess = db.Column(db.Integer, nullable=True)  # 👈 Add this line
 
 class Prediction(db.Model):
     __tablename__ = 'predictions'
@@ -780,6 +781,9 @@ ENTER_PICKS_HTML = r"""
 
             <label for="team_name">Team Name (optional):</label><br>
             <input type="text" id="team_name" name="team_name" value="{{ form_data.team_name }}"><br><br>
+            <label for="tiebreaker_guess">Enter Your Guess for Tiebreaker #2:</label><br>
+            <input type="number" id="tiebreaker_guess" name="tiebreaker_guess"
+                min="0" value="{{ form_data.tiebreaker_guess or '' }}"><br><br>
 
             <datalist id="player_list">
                 {% for p_name in player_names %}
@@ -1273,6 +1277,30 @@ def export_data():
 def submit_picks():
     entrant_name = request.form.get('entrant_name', '').strip()
     team_name = request.form.get('team_name', '').strip()
+    tiebreaker_raw = request.form.get('tiebreaker_guess', '').strip()
+    tiebreaker_raw = request.form.get('tiebreaker_guess', '').strip()
+
+    # 🚨 If it's not a valid non-negative integer, show an error and return immediately
+    if not tiebreaker_raw.isdigit() or int(tiebreaker_raw) < 0:
+        error_message = "Tiebreaker must be a non-negative integer."
+        form_data = {
+            "entrant_name": entrant_name,
+            "team_name": team_name,
+            "tiebreaker_guess": tiebreaker_raw,
+            "picks": {f'pick_{i}': request.form.get(f'pick_{i}', '') for i in range(1, MAX_PICK_NUMBER + 1)}
+        }
+        return render_template_string(
+            ENTER_PICKS_HTML,
+            max_pick=MAX_PICK_NUMBER,
+            player_names=PLAYER_NAME_SUGGESTIONS,
+            error_message=error_message,
+            form_data=form_data,
+            duplicate_picks=[], 
+            key=request.args.get("key")
+        )
+
+    # ✅ Only runs if tiebreaker is valid
+    tiebreaker_guess = int(tiebreaker_raw)
     pick_map = {}
     for pick_number in range(1, MAX_PICK_NUMBER + 1):
         val = request.form.get(f'pick_{pick_number}', '').strip()
@@ -1318,14 +1346,18 @@ def submit_picks():
     # Find or create entrant
     entrant = Entrant.query.filter_by(name=entrant_name).first()
     if not entrant:
-        entrant = Entrant(name=entrant_name, team_name=team_name)
+        entrant = Entrant(
+            name=entrant_name,
+            team_name=team_name,
+            tiebreaker_guess=tiebreaker_guess  # 👈 NEW
+        )
         db.session.add(entrant)
         db.session.commit()
     else:
         if team_name:
             entrant.team_name = team_name
+        entrant.tiebreaker_guess = tiebreaker_guess  # 👈 NEW
         db.session.commit()
-
     # Save picks
     for pick_number in range(1, MAX_PICK_NUMBER + 1):
         predicted_player = pick_map[pick_number]
