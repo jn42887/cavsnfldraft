@@ -683,7 +683,7 @@ ADMIN_HTML = r"""
 </html>
 """
 
-ENTER_PICKS_HTML = r"""
+<!-- ENTER_PICKS_HTML -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -725,7 +725,7 @@ ENTER_PICKS_HTML = r"""
         label {
             font-weight: 600;
         }
-        input[type="text"] {
+        input[type="text"], input[type="number"] {
             padding: 6px;
             width: 220px;
             margin: 5px 0;
@@ -760,9 +760,6 @@ ENTER_PICKS_HTML = r"""
         .duplicate {
             border: 2px solid red;
         }
-        datalist {
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -780,30 +777,26 @@ ENTER_PICKS_HTML = r"""
             <div class="error">{{ error_message }}</div>
         {% endif %}
 
-        <p>
-           Fill in your name, your team name (optional),
-           and pick a player from the official suggestions for each pick.
-        </p>
         <form method="POST" action="{{ url_for('submit_picks') }}">
             <label for="entrant_name">Your Name:</label><br>
             <input type="text" id="entrant_name" name="entrant_name" value="{{ form_data.entrant_name }}" required><br><br>
 
             <label for="team_name">Team Name (optional):</label><br>
             <input type="text" id="team_name" name="team_name" value="{{ form_data.team_name }}"><br><br>
+
             <label for="tiebreaker_guess">Tiebreaker #2: How many trades will happen during the first round?</label><br>
             <input type="number" id="tiebreaker_guess" name="tiebreaker_guess"
                 min="0" value="{{ form_data.tiebreaker_guess or '' }}"><br><br>
+
+            <div class="datalist-instruction">
+                (Suggestions will update dynamically to prevent duplicates.)
+            </div>
 
             <datalist id="player_list">
                 {% for p_name in player_names %}
                     <option value="{{ p_name }}">
                 {% endfor %}
             </datalist>
-            <div class="datalist-instruction">
-                (Suggestions will appear when you begin typing a player name. 
-                 We'll reject any custom name not in this list.)
-            </div>
-            <br>
 
             {% for pick_number in range(1, max_pick+1) %}
                 {% set field_name = 'pick_' ~ pick_number %}
@@ -811,20 +804,52 @@ ENTER_PICKS_HTML = r"""
                 <div class="pick-group">
                     <label>Pick #{{ pick_number }}:</label><br>
                     <input type="text"
-                           name="pick_{{ pick_number }}"
-                           placeholder="Player Name"
-                           list="player_list"
-                           value="{{ val }}"
-                           class="{% if pick_number in duplicate_picks %}duplicate{% endif %}">
+                        name="pick_{{ pick_number }}"
+                        class="player-input"
+                        placeholder="Player Name"
+                        list="player_list"
+                        value="{{ val }}"
+                        data-pick="{{ pick_number }}"
+                        class="{% if pick_number in duplicate_picks %}duplicate{% endif %}">
                 </div>
             {% endfor %}
 
             <button class="submit-btn" type="submit">Submit Picks</button>
         </form>
     </div>
+
+    <script>
+        const inputs = document.querySelectorAll('.player-input');
+        const originalOptions = Array.from(document.querySelectorAll('#player_list option')).map(opt => opt.value);
+
+        function updateSuggestions() {
+            const selectedValues = new Set();
+            inputs.forEach(input => {
+                const val = input.value.trim();
+                if (val !== '') selectedValues.add(val);
+            });
+
+            inputs.forEach(input => {
+                const currentVal = input.value.trim();
+                const filtered = originalOptions.filter(opt => !selectedValues.has(opt) || opt === currentVal);
+
+                // Clear and re-add filtered options
+                const list = document.getElementById('player_list');
+                while (list.firstChild) list.removeChild(list.firstChild);
+                filtered.forEach(val => {
+                    const option = document.createElement('option');
+                    option.value = val;
+                    list.appendChild(option);
+                });
+            });
+        }
+
+        inputs.forEach(input => {
+            input.addEventListener('input', updateSuggestions);
+        });
+    </script>
 </body>
 </html>
-"""
 
 TEAM_SELECT_HTML = r"""
 <!DOCTYPE html>
