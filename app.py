@@ -648,27 +648,36 @@ ADMIN_HTML = r"""
 
         <div class="section-title">Delete a Team</div>
         <p>Click "Delete" to remove an entire team's entry (entrant + predictions + standings).</p>
-        <table class="team-table">
-            <tr>
-                <th>Team Name</th>
-                <th>Entrant Name</th>
-                <th>Action</th>
-            </tr>
-            {% for row in teams_data %}
-            <tr>
-                <td>{{ row.team_name }}</td>
-                <td>{{ row.name }}</td>
-                <td>
-                    <form action="{{ url_for('delete_team') }}" method="POST">
-                        <input type="hidden" name="team_name" value="{{ row.team_name }}">
-                        <input type="hidden" name="entrant_id" value="{{ row.entrant_id }}">
-                        <input type="hidden" name="key" value="{{ request.args.get('key') }}">
-                        <button class="delete-btn" type="submit">Delete</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </table>
+    <table class="team-table">
+        <tr>
+            <th>Team Name</th>
+            <th>Entrant Name</th>
+            <th>Tiebreaker Guess</th>
+            <th>Actions</th>
+        </tr>
+        {% for row in teams_data %}
+        <tr>
+            <td>{{ row.team_name }}</td>
+            <td>{{ row.name }}</td>
+            <td>
+                <form action="{{ url_for('update_tiebreaker') }}" method="POST" style="display:inline;">
+                    <input type="hidden" name="entrant_id" value="{{ row.entrant_id }}">
+                    <input type="hidden" name="key" value="{{ request.args.get('key') }}">
+                    <input type="number" name="tiebreaker_guess" min="0" value="{{ row.tiebreaker_guess or '' }}" style="width: 80px;">
+                    <button type="submit">Save</button>
+                </form>
+            </td>
+            <td>
+                <form action="{{ url_for('delete_team') }}" method="POST" style="display:inline;">
+                    <input type="hidden" name="team_name" value="{{ row.team_name }}">
+                    <input type="hidden" name="entrant_id" value="{{ row.entrant_id }}">
+                    <input type="hidden" name="key" value="{{ request.args.get('key') }}">
+                    <button class="delete-btn" type="submit">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
     </div>
 </body>
 </html>
@@ -1186,6 +1195,25 @@ def update_pick():
     key = request.form.get("key") or request.args.get("key")
     return redirect(url_for('admin_panel', key=key))
 
+@app.route('/update_tiebreaker', methods=['POST'])
+def update_tiebreaker():
+    key = request.form.get("key")
+    if key != "analytics":
+        return redirect(url_for("standings", key=key))
+
+    entrant_id = request.form.get("entrant_id")
+    guess_raw = request.form.get("tiebreaker_guess", "").strip()
+
+    try:
+        entrant = Entrant.query.filter_by(entrant_id=int(entrant_id)).first()
+        if entrant and guess_raw.isdigit():
+            entrant.tiebreaker_guess = int(guess_raw)
+            db.session.commit()
+    except Exception as e:
+        print("Error updating tiebreaker guess:", e)
+
+    return redirect(url_for("admin_panel", key=key))
+
 @app.route('/delete_team', methods=['POST'])
 def delete_team():
     key = request.form.get('key')
@@ -1240,14 +1268,19 @@ def export_data():
     writer = csv.writer(output)
 
     # First section: Standings
-    writer.writerow(['Entrant Name', 'Team Name', 'Total Score'])
+    writer.writerow(['Entrant Name', 'Team Name', 'Tiebreaker Guess', 'Total Score'])
     standings = (
-        db.session.query(Entrant.name, Entrant.team_name, EntrantStanding.total_score)
+        db.session.query(
+            Entrant.name,
+            Entrant.team_name,
+            Entrant.tiebreaker_guess,
+            EntrantStanding.total_score
+        )
         .outerjoin(EntrantStanding, Entrant.entrant_id == EntrantStanding.entrant_id)
         .all()
     )
-    for name, team, score in standings:
-        writer.writerow([name, team or "", score or 0])
+    for name, team, tiebreaker, score in standings:
+        writer.writerow([name, team or "", tiebreaker if tiebreaker is not None else "", score or 0])
 
     writer.writerow([])  # Empty row between sections
 
