@@ -781,7 +781,7 @@ ENTER_PICKS_HTML = r"""
 
             <label for="team_name">Team Name (optional):</label><br>
             <input type="text" id="team_name" name="team_name" value="{{ form_data.team_name }}"><br><br>
-            <label for="tiebreaker_guess">Enter Your Guess for Tiebreaker #2:</label><br>
+            <label for="tiebreaker_guess">Tiebreaker #2: How many trades will happen during the first round?</label><br>
             <input type="number" id="tiebreaker_guess" name="tiebreaker_guess"
                 min="0" value="{{ form_data.tiebreaker_guess or '' }}"><br><br>
 
